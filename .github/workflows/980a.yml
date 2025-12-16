@@ -30,8 +30,8 @@ jobs:
 
       - name: Run ETF Scraper (執行爬蟲)
         run: |
-          # 假設您的 python 檔名為 main.py，若不同請自行修改
-          python main.py
+          # python 檔名
+          python 980a.py
 
       - name: Commit and Push changes (存檔並推送)
         run: |
