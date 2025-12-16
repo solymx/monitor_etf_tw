@@ -3,18 +3,19 @@ import pandas as pd
 import os
 import shutil
 from datetime import datetime, date
+import traceback # 引入這個以便查看錯誤細節
 
 # ==========================================
 # 1. 設定區
 # ==========================================
 FOLDER_NAME = "985a"            # 備份資料夾名稱
 CSV_FILENAME = "985a.csv"       # 最新數據 CSV
-HTML_FILENAME = "985a.html"    # 產出的報表名稱
+HTML_FILENAME = "985a.html"     # 產出的報表名稱
 API_URL = "https://www.nomurafunds.com.tw/API/ETFAPI/api/Fund/GetFundAssets"
 
-# 設定查詢日期 (預設今天)
+# 設定查詢日期 (正式運行請使用 date.today())
 SEARCH_DATE = str(date.today()) 
-#SEARCH_DATE = "2025-12-15" # 測試用
+#SEARCH_DATE = "2025-12-15" # 測試用 (若要測試特定日期可打開此行)
 
 PAYLOAD = {
     "FundID": "00985A",
@@ -46,16 +47,22 @@ def fetch_data():
                 columns = [col['Name'] for col in stock_data['Columns']]
                 df = pd.DataFrame(stock_data['Rows'], columns=columns)
                 
-                # 數值清洗：移除逗號並轉為數字
-                numeric_cols = ['股數', '權重', '股價', '市值'] 
+                # ---【修正重點開始】數值清洗邏輯 ---
+                # 移除逗號並轉為數字，解決 FutureWarning
                 for col in df.columns:
-                    # 只要欄位名稱包含上述關鍵字，就嘗試轉數字
+                    # 只要欄位名稱包含這些關鍵字，就進行轉換
                     if any(x in col for x in ['股數', '權重', '數', '值']):
                         try:
+                            # 1. 先轉字串並移除逗號
                             df[col] = df[col].astype(str).str.replace(',', '')
-                            df[col] = pd.to_numeric(df[col], errors='ignore')
-                        except:
-                            pass
+                            # 2. 強制轉數字 (無法轉的變成 NaN)
+                            df[col] = pd.to_numeric(df[col], errors='coerce')
+                            # 3. 將 NaN 補為 0 (避免後續計算出錯)
+                            df[col] = df[col].fillna(0)
+                        except Exception as e:
+                            print(f"欄位 {col} 轉換數值時發生錯誤: {e}")
+                # ---【修正重點結束】---
+
                 return df
             else:
                 print("錯誤: 找不到股票資料表 (可能是假日或無資料)")
@@ -74,9 +81,8 @@ def process_comparison(df_new):
     if not os.path.exists(FOLDER_NAME):
         os.makedirs(FOLDER_NAME)
 
-    # ================= 修正點 1: 確保新資料的 Key 是字串 =================
+    # 確保新資料的 Key 是字串
     key_col = '股票代號'
-    # 確保 df_new 的股票代號是字串 (避免 API 傳回數字型態，雖然通常是字串)
     if key_col in df_new.columns:
         df_new[key_col] = df_new[key_col].astype(str).str.strip()
 
@@ -87,11 +93,9 @@ def process_comparison(df_new):
         print("發現舊資料，進行比對...")
         try:
             # 讀取 CSV
-            # 可以使用 dtype 參數強制讀取為字串，或者讀完後轉換
             df_old = pd.read_csv(CSV_FILENAME)
             
-            # ================= 修正點 2: 確保舊資料的 Key 是字串 =================
-            # 這是報錯的主因：CSV 讀進來會變成 int，必須轉回 str 才能跟 df_new merge
+            # 確保舊資料的 Key 是字串
             if key_col in df_old.columns:
                 df_old[key_col] = df_old[key_col].astype(str).str.strip()
             
@@ -137,8 +141,6 @@ def process_comparison(df_new):
             print(f"舊檔已備份至: {backup_path}")
             
         except Exception as e:
-            # 這裡把具體的錯誤印出來，方便你確認是不是其他問題
-            import traceback
             traceback.print_exc()
             print(f"比對過程錯誤 (將略過比對): {e}")
             df_final['狀態'] = '比對失敗'
