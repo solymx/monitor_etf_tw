@@ -1,0 +1,60 @@
+name: Daily ETF Holdings Scraper (981A & 982A)
+
+on:
+  schedule:
+    - cron: '0 10 * * *' # 每天 UTC 10:00 (台灣時間 18:00)
+  workflow_dispatch:      # 允許手動點擊按鈕觸發
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      # 安裝依賴庫
+      # ⚠️ 注意：你的新程式用到 Pandas 的 style.to_html，這通常需要 Jinja2
+      - name: Install dependencies
+        run: |
+          pip install requests beautifulsoup4 pandas lxml Jinja2
+
+      # 執行原本的 981a 程式 (假設檔名是 981a.py)
+      - name: Run 981a Scraper
+        run: python 981a.py
+        continue-on-error: true  # 避免其中一個失敗導致整個流程停住
+
+      # 執行新的 982a 程式 (請確保你的新 python 檔名存為 982a.py)
+      - name: Run 982a Scraper
+        run: python 982a.py
+        continue-on-error: true
+
+      - name: Commit and Push if changes
+        run: |
+          git config --global user.name "GitHub Action Bot"
+          git config --global user.email "action@github.com"
+          
+          # --- 處理 981a 的檔案 (保留你原本的邏輯) ---
+          # 加上 || true 是為了防止如果檔案不存在時報錯
+          git add 981a.csv 981a/*.csv 981a.html 2>/dev/null || true
+          
+          # --- 處理 982a 的檔案 (新邏輯) ---
+          # 1. 加入根目錄最新的 CSV 與 HTML (*_00982a.csv)
+          git add *_00982a.csv *_00982a.html 2>/dev/null || true
+          
+          # 2. 加入備份資料夾 (982a/)
+          git add 982a/ 2>/dev/null || true
+          
+          # 3. 關鍵：使用 -u 讓 git 知道有些檔案從根目錄「消失」(被搬移) 了
+          git add -u
+          
+          timestamp=$(date -u)
+          git commit -m "Update holdings: ${timestamp}" || exit 0
+          git push
