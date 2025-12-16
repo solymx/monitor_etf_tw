@@ -1,0 +1,40 @@
+name: 00981A Daily ETF Holdings Scraper
+
+on:
+  schedule:
+    - cron: '0 10 * * *' # 每天台灣時間 18:00
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install requests beautifulsoup4 pandas lxml
+
+      - name: Run Scraper
+        run: python 981a.py
+
+      - name: Commit and Push if changes
+        run: |
+          git config --global user.name "GitHub Action Bot"
+          git config --global user.email "action@github.com"
+          
+          # 修改這裡：改成抓 981a.csv 以及歷史備份
+          git add 981a.csv 981a/*.csv 981a.html
+          
+          timestamp=$(date -u)
+          git commit -m "Update holdings: ${timestamp}" || exit 0
+          git push
