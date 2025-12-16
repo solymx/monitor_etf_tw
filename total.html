@@ -104,6 +104,7 @@ body { font-family: 'Noto Sans TC', sans-serif; background-color: #f8f9fa; }
                                 <th>代號</th>
                                 <th>股票名稱</th>
                                 <th class="text-center">被持有數</th>
+                                <th>合計權重</th>
                                 <th>持有者明細</th>
                                 <th class="d-none">權重排序用</th> </tr>
                         </thead>
@@ -203,11 +204,17 @@ function processData(fundId, data) {
 
 function renderDashboard() {
     const tableBody = $('#stocksTable tbody');
+    
+    // 1. 整理數據並計算合計權重
     const stocksArray = Object.keys(stockData).map(key => {
+        // 計算該股票在所有 ETF 中的權重總和
+        let sumWeight = stockData[key].weights.reduce((acc, curr) => acc + curr.val, 0);
+        
         return {
             code: key,
             ...stockData[key],
-            count: stockData[key].holders.length
+            count: stockData[key].holders.length,
+            totalWeight: sumWeight.toFixed(2) // 取小數點後兩位
         };
     });
 
@@ -217,13 +224,14 @@ function renderDashboard() {
     $('#consensus-3').text(stocksArray.filter(s => s.count === 3).length);
     $('#consensus-2').text(stocksArray.filter(s => s.count === 2).length);
 
-    // 準備圖表數據 (只顯示持有數 >= 3 的熱門股)
+    // 準備圖表數據
     let chartData = stocksArray.filter(s => s.count >= 3).sort((a, b) => b.count - a.count);
-    // 限制顯示數量以免太擁擠
     if(chartData.length > 20) chartData = chartData.slice(0, 20);
 
+    // 繪製圖表 (若已存在則先銷毀，避免重疊)
     const ctx = document.getElementById('holdingsChart').getContext('2d');
-    new Chart(ctx, {
+    if (window.myChart) window.myChart.destroy(); // 防止圖表重複渲染
+    window.myChart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: chartData.map(s => `${s.name} (${s.code})`),
@@ -236,25 +244,19 @@ function renderDashboard() {
         },
         options: {
             responsive: true,
-            plugins: {
-                legend: { display: false }
-            },
-            scales: {
-                y: { beginAtZero: true, ticks: { stepSize: 1 } }
-            }
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
         }
     });
 
     // 渲染表格
+    tableBody.empty(); // 清空舊資料
     stocksArray.forEach(stock => {
         // 產生持有者徽章
         let badges = '';
         files.forEach(f => {
             if (stock.holders.includes(f.id)) {
                 badges += `<span class="badge ${f.color} badge-fund">${f.name}</span>`;
-            } else {
-                // 佔位符保持對齊 (可選)
-                // badges += `<span class="badge bg-light text-light badge-fund" style="visibility:hidden">....</span>`;
             }
         });
 
@@ -262,20 +264,47 @@ function renderDashboard() {
         if (stock.count === 4) countClass = 'consensus-high';
         else if (stock.count === 3) countClass = 'consensus-mid';
 
+        // 產生權重條 (最高設為 5% 填滿，可自己調整顯示比例)
+        // 這裡設定 width: min(weight * 20, 100) 意思是 5% 就會滿格，讓視覺差異明顯一點
+        let weightBar = `
+            <div class="d-flex align-items-center" style="min-width: 100px;">
+                <span class="me-2 small fw-bold">${stock.totalWeight}%</span>
+                <div class="progress flex-grow-1" style="height: 6px;">
+                    <div class="progress-bar bg-info" role="progressbar" 
+                         style="width: ${Math.min(stock.totalWeight * 20, 100)}%"></div>
+                </div>
+            </div>
+        `;
+
+        // Yahoo 股市連結
+        let stockLink = `https://tw.stock.yahoo.com/quote/${stock.code}`;
+
         tableBody.append(`
             <tr>
-                <td><span class="badge bg-secondary">${stock.code}</span></td>
-                <td class="fw-bold">${stock.name}</td>
+                <td>
+                    <a href="${stockLink}" target="_blank" class="badge bg-secondary text-decoration-none" title="點擊查看股價">
+                        ${stock.code} 🔗
+                    </a>
+                </td>
+                <td class="fw-bold">
+                    <a href="${stockLink}" target="_blank" class="text-dark text-decoration-none">
+                        ${stock.name}
+                    </a>
+                </td>
                 <td class="text-center ${countClass}" style="font-size:1.2em;">${stock.count}</td>
-                <td>${badges}</td>
+                <td>${weightBar}</td> <td>${badges}</td>
                 <td class="d-none">${stock.count}</td>
             </tr>
         `);
     });
 
-    // 啟動 DataTables
+    // 啟動 DataTables (如果已經初始化過，要先銷毀再重建)
+    if ($.fn.DataTable.isDataTable('#stocksTable')) {
+        $('#stocksTable').DataTable().destroy();
+    }
+    
     $('#stocksTable').DataTable({
-        "order": [[ 2, "desc" ]], // 預設依據被持有數 (第3欄) 降序排列
+        "order": [[ 2, "desc" ]], 
         "pageLength": 25,
         "language": {
             "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/zh-HANT.json"
