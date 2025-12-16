@@ -2,15 +2,18 @@ import requests
 import pandas as pd
 from datetime import datetime
 import os
-import glob
 import shutil
 import traceback
 
 # --- 設定區 ---
 API_URL = "https://www.capitalfund.com.tw/CFWeb/api/etf/buyback"
-FUND_ID = "399"   # ⚠️ 請確認這是你要抓的基金代號 (399=00929)。如果要抓 00982，請填入正確代號。
-FILE_TAG = "00982a"  # 檔名識別字 (生成的檔案會是 YYYYMMDD_00982a.csv)
-BACKUP_FOLDER = "982a" # 備份舊檔案的資料夾名稱
+FUND_ID = "399"   # ⚠️ 請確認代號 (399=00929, 00982請自行填入正確代號)
+FILE_NAME = "982a" # 固定檔名 (會產生 982a.csv 和 982a.html)
+BACKUP_FOLDER = "982a_backup" # 備份舊檔案的資料夾名稱
+
+# 定義固定檔名路徑
+CSV_FILE_PATH = f"{FILE_NAME}.csv"
+HTML_FILE_PATH = f"{FILE_NAME}.html"
 
 # Payload
 payload = {
@@ -27,63 +30,44 @@ headers = {
 
 def get_previous_csv():
     """
-    尋找當前目錄下最近的一份舊 CSV 檔案
+    直接讀取當前目錄下的固定檔名 CSV 作為舊資料
     """
-    # 找尋所有符合格式的 CSV
-    csv_files = glob.glob(f"*_{FILE_TAG}.csv")
-    
-    # 如果沒有任何檔案，回傳 None
-    if not csv_files:
+    if os.path.exists(CSV_FILE_PATH):
+        print(f"🔎 找到舊資料進行比對: {CSV_FILE_PATH}")
+        return CSV_FILE_PATH
+    else:
+        print("🔎 目前沒有舊資料，將視為首次執行。")
         return None
-    
-    # 根據檔名排序 (日期在前面，所以排序最後一個就是最近日期的)
-    csv_files.sort()
-    
-    # 取出最後一個檔案
-    latest_file = csv_files[-1]
-    
-    print(f"🔎 找到上一份資料進行比對: {latest_file}")
-    return latest_file
 
 def analyze_changes(today_df, prev_file_path):
     """
     比對今日與昨日持股，產生狀態欄位
     """
     if not prev_file_path:
-        # 如果沒有舊檔案，所有股票都算 "新資料"
         today_df['狀態'] = '🆕 首次抓取'
         today_df['股數變化'] = 0
         return today_df
 
-    # 讀取舊檔案
     try:
-        # 🟢【修正點 1】讀取時指定 '股票代號' 為字串，避免 0050 變成 50
+        # 讀取舊檔案 (指定字串避免 0050 變 50)
         prev_df = pd.read_csv(prev_file_path, dtype={'股票代號': str})
-        
-        # 雙重保險：確保轉為字串並去除空白
         prev_df['股票代號'] = prev_df['股票代號'].astype(str).str.strip()
 
-        # 只取需要的欄位來比對
         prev_df = prev_df[['股票代號', '持有股數', '股票名稱']]
-        prev_df.columns = ['股票代號', '昨日股數', '昨日名稱'] # 改名避免衝突
+        prev_df.columns = ['股票代號', '昨日股數', '昨日名稱']
     except Exception as e:
         print(f"⚠️ 讀取舊檔案失敗 ({e})，略過比對")
         today_df['狀態'] = '-'
         return today_df
 
-    # --- 關鍵步驟：合併 (Outer Join) 以包含賣出的股票 ---
-    # 🟢 現在兩邊的 '股票代號' 都是字串 (Object)，可以安全合併了
+    # 合併比對
     merged_df = pd.merge(today_df, prev_df, on='股票代號', how='outer')
-
-    # 填補名稱：如果是「賣出」的股票，today_df 的股票名稱會是 NaN，要用舊檔案的名稱補回來
     merged_df['股票名稱'] = merged_df['股票名稱'].fillna(merged_df['昨日名稱'])
 
-    # 計算變化
-    merged_df['持有股數'] = merged_df['持有股數'].fillna(0) # 今天沒股數 = 0
-    merged_df['昨日股數'] = merged_df['昨日股數'].fillna(0) # 昨天沒股數 = 0
+    merged_df['持有股數'] = merged_df['持有股數'].fillna(0)
+    merged_df['昨日股數'] = merged_df['昨日股數'].fillna(0)
     merged_df['股數變化'] = merged_df['持有股數'] - merged_df['昨日股數']
 
-    # 定義狀態判斷函式
     def determine_status(row):
         if row['昨日股數'] == 0 and row['持有股數'] > 0:
             return "🔥 新進"
@@ -98,58 +82,56 @@ def analyze_changes(today_df, prev_file_path):
 
     merged_df['狀態'] = merged_df.apply(determine_status, axis=1)
 
-    # 整理欄位 (移除輔助用的欄位)
     final_df = merged_df[['股票代號', '股票名稱', '權重(%)', '持有股數', '股數變化', '狀態']]
-    
-    # 排序：持有的排上面 (權重高到低)，賣出的排最後
     final_df = final_df.sort_values(by=['權重(%)'], ascending=False, na_position='last')
     
     return final_df
 
-def manage_backups(today_filename):
+def backup_old_files():
     """
-    將非今日的舊 CSV 檔案移動到備份資料夾
+    在覆蓋檔案之前，先將現有的 982a.csv / 982a.html 備份起來
+    備份檔名會加上 '修改日期'
     """
-    # 確保備份資料夾存在
     if not os.path.exists(BACKUP_FOLDER):
         os.makedirs(BACKUP_FOLDER)
-        # print(f"📁 建立備份資料夾: {BACKUP_FOLDER}")
 
-    # 搜尋根目錄下的目標 CSV
-    files = glob.glob(f"*_{FILE_TAG}.csv")
-    
-    for file in files:
-        # 如果這個檔案 "不是" 今天要產生的檔案，就搬進去
-        if file != today_filename:
-            destination = os.path.join(BACKUP_FOLDER, file)
-            # 如果備份資料夾已經有同名檔案，先刪除舊的以避免報錯
-            if os.path.exists(destination):
-                os.remove(destination)
+    for file_path in [CSV_FILE_PATH, HTML_FILE_PATH]:
+        if os.path.exists(file_path):
+            # 取得檔案最後修改時間來當作檔名日期
+            mod_time = os.path.getmtime(file_path)
+            date_str = datetime.fromtimestamp(mod_time).strftime("%Y%m%d")
             
-            shutil.move(file, destination)
-            print(f"📦 已備份舊檔案: {file} -> {BACKUP_FOLDER}/")
+            # 備份檔名例如: 982a_backup/20231215_982a.csv
+            file_ext = os.path.splitext(file_path)[1]
+            backup_name = f"{date_str}_{FILE_NAME}{file_ext}"
+            destination = os.path.join(BACKUP_FOLDER, backup_name)
+
+            try:
+                # 這裡改用 copy 還是 move? 
+                # 建議 move，因為等一下主程式會產生新的同名檔案
+                shutil.move(file_path, destination)
+                print(f"📦 已將舊檔備份至: {destination}")
+            except Exception as e:
+                print(f"⚠️ 備份失敗 {file_path}: {e}")
 
 def save_html(df, file_path, title_date):
     """
-    存成漂亮的 HTML，加入顏色標示
+    存成 HTML
     """
-    # 針對狀態做顏色標記的函式 (CSS)
     def color_status(val):
         color = 'black'
         weight = 'normal'
         if '新進' in val: color = 'red'; weight = 'bold'
-        elif '增加' in val: color = '#d9534f' # 紅色系
+        elif '增加' in val: color = '#d9534f'
         elif '減少' in val: color = 'green'
         elif '賣出' in val: color = 'gray'; weight = 'bold'
         return f'color: {color}; font-weight: {weight}'
 
-    # 針對整列做背景色的函式 (賣出顯示灰色背景)
     def row_style(row):
         if '賣出' in row['狀態']:
             return ['background-color: #f9f9f9; color: #999'] * len(row)
         return [''] * len(row)
 
-    # 產生 HTML 表格
     try:
         styler = df.style.map(color_status, subset=['狀態'])
     except AttributeError:
@@ -175,7 +157,7 @@ def save_html(df, file_path, title_date):
         </style>
     </head>
     <body>
-        <h2>📊 {FILE_TAG} 持股變化日報 ({title_date})</h2>
+        <h2>📊 {FILE_NAME} 持股變化日報 ({title_date})</h2>
         {html_content}
         <p style="color: #666; font-size: 0.9em;">資料產生時間: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
     </body>
@@ -198,41 +180,32 @@ def main():
                 stock_list = raw_data['data']['stocks']
                 
                 if stock_list:
-                    # 1. 轉成 DataFrame
+                    # 1. 轉成 DataFrame 並清洗
                     df = pd.DataFrame(stock_list)
-                    
-                    # 2. 清洗資料
                     df = df[['stocNo', 'stocName', 'weight', 'shareFormat']]
                     df.columns = ['股票代號', '股票名稱', '權重(%)', '持有股數']
-                    
-                    # 🟢【修正點 2】強制將今日資料的股票代號轉為字串，並去除空白
                     df['股票代號'] = df['股票代號'].astype(str).str.strip()
-                    
-                    # 轉型態確保計算正確 (移除逗號轉數字)
                     df['持有股數'] = df['持有股數'].astype(str).str.replace(',', '').astype(float)
                     
-                    # 3. 尋找舊檔案並進行比對
+                    # 2. 尋找舊檔案 (固定檔名 982a.csv)
                     prev_csv = get_previous_csv()
+                    
+                    # 3. 進行比對分析
                     final_df = analyze_changes(df, prev_csv)
                     
-                    # 4. 準備檔名
-                    today_str = datetime.now().strftime("%Y%m%d")
-                    csv_filename = f"{today_str}_{FILE_TAG}.csv"
-                    html_filename = f"{today_str}_{FILE_TAG}.html"
+                    # 4. 備份舊檔案 (如果有舊的 982a.csv，把它改名移走)
+                    backup_old_files()
                     
-                    # 5. 檔案管理 (備份舊的 CSV)
-                    manage_backups(csv_filename)
-                    
-                    # 6. 儲存最新的 CSV 與 HTML 到根目錄
-                    final_df.to_csv(csv_filename, index=False, encoding='utf-8-sig')
-                    save_html(final_df, html_filename, today_str)
+                    # 5. 儲存最新的 CSV 與 HTML (使用固定檔名)
+                    today_str = datetime.now().strftime("%Y-%m-%d")
+                    final_df.to_csv(CSV_FILE_PATH, index=False, encoding='utf-8-sig')
+                    save_html(final_df, HTML_FILE_PATH, today_str)
                     
                     print(f"\n✅ 完成！")
-                    print(f"   - 最新 CSV: {csv_filename}")
-                    print(f"   - 最新 HTML: {html_filename}")
-                    print(f"   - 歷史備份: 詳見 {BACKUP_FOLDER}/ 資料夾")
+                    print(f"   - 最新檔案: {CSV_FILE_PATH}")
+                    print(f"   - 最新網頁: {HTML_FILE_PATH}")
                     
-                    # 顯示變化摘要 (在終端機預覽)
+                    # 顯示變化摘要
                     changes = final_df[final_df['狀態'].isin(['🔥 新進', '👋 賣出', '🔺 增加', '🔻 減少'])]
                     if not changes.empty:
                         print(f"\n📢 今日異動 ({len(changes)} 筆):")
@@ -249,7 +222,6 @@ def main():
 
     except Exception as e:
         print(f"❌ 發生錯誤: {e}")
-        # 印出完整錯誤訊息以便除錯
         traceback.print_exc()
 
 if __name__ == "__main__":
