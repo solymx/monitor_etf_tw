@@ -1,0 +1,49 @@
+name: Daily ETF 00985A Tracker
+
+on:
+  schedule:
+    # GitHub Actions 使用 UTC 時間
+    # 台灣時間 (UTC+8) 18:30 = UTC 時間 10:30
+    - cron: '45 10 * * *'
+  workflow_dispatch: # 允許手動點擊按鈕觸發測試
+
+permissions:
+  contents: write  # 給予腳本寫入權限，以便將 CSV/HTML 推送回倉庫
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code (檢出程式碼)
+        uses: actions/checkout@v3
+
+      - name: Set up Python (設定 Python 環境)
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies (安裝套件)
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests pandas
+
+      - name: Run ETF Scraper (執行爬蟲)
+        run: |
+          # python 檔名
+          python 985a.py
+
+      - name: Commit and Push changes (存檔並推送)
+        run: |
+          # 設定 git 使用者身份
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          # 加入所有變更 (包含 csv, html 和 985a 資料夾)
+          git add .
+          
+          # 提交變更 (若無變更則跳過，避免報錯)
+          git commit -m "Auto update: 00985A data $(date +'%Y-%m-%d')" || exit 0
+          
+          # 推送回倉庫
+          git push
