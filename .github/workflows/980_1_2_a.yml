@@ -1,4 +1,4 @@
-name: Daily ETF Holdings Scraper (981A & 982A)
+name: Daily ETF Holdings Scraper (981A, 982A & 980A)
 
 on:
   schedule:
@@ -21,40 +21,44 @@ jobs:
           python-version: '3.9'
 
       # 安裝依賴庫
-      # ⚠️ 注意：你的新程式用到 Pandas 的 style.to_html，這通常需要 Jinja2
       - name: Install dependencies
         run: |
           pip install requests beautifulsoup4 pandas lxml Jinja2
 
-      # 執行原本的 981a 程式 (假設檔名是 981a.py)
+      # --- 既有的爬蟲 ---
       - name: Run 981a Scraper
         run: python 981a.py
-        continue-on-error: true  # 避免其中一個失敗導致整個流程停住
+        continue-on-error: true
 
-      # 執行新的 982a 程式 (請確保你的新 python 檔名存為 982a.py)
       - name: Run 982a Scraper
         run: python 982a.py
         continue-on-error: true
 
+      # --- 新增的 980A 爬蟲 ---
+      - name: Run 980a Scraper
+        run: python 980a.py
+        continue-on-error: true
+
+      # --- Commit 與 Push ---
       - name: Commit and Push if changes
         run: |
           git config --global user.name "GitHub Action Bot"
           git config --global user.email "action@github.com"
           
-          # --- 處理 981a 的檔案 (保留你原本的邏輯) ---
-          # 加上 || true 是為了防止如果檔案不存在時報錯
+          # 1. 處理 981a
           git add 981a.csv 981a/*.csv 981a.html 2>/dev/null || true
           
-          # --- 處理 982a 的檔案 (新邏輯) ---
-          # 1. 加入根目錄最新的 CSV 與 HTML (*_00982a.csv)
-          git add *_00982a.csv *_00982a.html 2>/dev/null || true
+          # 2. 處理 982a
+          git add *_00982a.csv *_00982a.html 982a/ 2>/dev/null || true
           
-          # 2. 加入備份資料夾 (982a/)
-          git add 982a/ 2>/dev/null || true
+          # 3. 處理 980a (新增的部分)
+          # 加入根目錄的 csv 以及 980a 資料夾內的所有檔案
+          git add 980a.csv 980a/*.csv 2>/dev/null || true
           
-          # 3. 關鍵：使用 -u 讓 git 知道有些檔案從根目錄「消失」(被搬移) 了
+          # 處理刪除或移動的檔案
           git add -u
           
           timestamp=$(date -u)
+          # 如果沒有變更 (例如假日沒資料)，commit 會失敗，|| exit 0 讓流程顯示綠勾勾
           git commit -m "Update holdings: ${timestamp}" || exit 0
           git push
