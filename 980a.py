@@ -13,8 +13,8 @@ HTML_FILENAME = "980a.html"    # 產出的報表名稱
 API_URL = "https://www.nomurafunds.com.tw/API/ETFAPI/api/Fund/GetFundAssets"
 
 # 設定查詢日期 (預設今天)
-# SEARCH_DATE = str(date.today()) 
-SEARCH_DATE = "2025-12-15" # 測試用
+SEARCH_DATE = str(date.today()) 
+#SEARCH_DATE = #SEARCH_DATE # 測試用
 
 PAYLOAD = {
     "FundID": "00980A",
