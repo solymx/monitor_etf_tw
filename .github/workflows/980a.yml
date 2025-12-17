@@ -3,8 +3,8 @@ name: Daily ETF 00980A Tracker
 on:
   schedule:
     # GitHub Actions 使用 UTC 時間
-    # 台灣時間 (UTC+8) 18:30 = UTC 時間 10:30
-    - cron: '30 10 * * *'
+    # 台灣時間 (UTC+8) 17:30 = UTC 時間 10:30
+    - cron: '30 9 * * *'
   workflow_dispatch: # 允許手動點擊按鈕觸發測試
 
 permissions:
