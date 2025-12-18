@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ETF 持股戰情室</title>
+<title>ETF 持股戰情室 - 5台大會師</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
@@ -13,303 +13,210 @@ body { font-family: 'Noto Sans TC', sans-serif; background-color: #f8f9fa; }
 .card { border: none; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
 .card-header { background-color: #fff; border-bottom: 1px solid #eee; font-weight: bold; border-radius: 12px 12px 0 0 !important; }
 .badge-fund { font-size: 0.85em; margin-right: 4px; padding: 6px 10px; border-radius: 20px; }
+/* 顏色定義 */
 .bg-980a { background-color: #e3f2fd; color: #0d6efd; border: 1px solid #b6d4fe; }
 .bg-981a { background-color: #f8d7da; color: #dc3545; border: 1px solid #f5c6cb; }
 .bg-982a { background-color: #d1e7dd; color: #198754; border: 1px solid #badbcc; }
 .bg-985a { background-color: #fff3cd; color: #ffc107; border: 1px solid #ffecb5; }
-.bg-fff { background-color: #fff; }
+.bg-991a { background-color: #f3e5f5; color: #9c27b0; border: 1px solid #e1bee7; }
 
-.consensus-high { color: #dc3545; font-weight: bold; } /* 4家持有 */
-.consensus-mid { color: #fd7e14; font-weight: bold; } /* 3家持有 */
+.consensus-high { color: #dc3545; font-weight: bold; } 
+.consensus-mid { color: #fd7e14; font-weight: bold; }
 
 #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; }
 .metric-value { font-size: 2rem; font-weight: bold; color: #2c3e50; }
-.metric-label { color: #6c757d; font-size: 0.9rem; }
+.metric-label { color: #6c757d; font-size: 0.8rem; }
+.col-custom { flex: 0 0 auto; width: 20%; }
+@media (max-width: 768px) { .col-custom { width: 50%; } }
 </style>
 </head>
 <body>
 
 <div id="loading">
-<div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;"></div>
-<h5>正在讀取並分析 CSV 資料...</h5>
-<p class="text-muted small">請確保檔案已上傳且名稱正確</p>
+<div class="spinner-border text-primary mb-3" role="status"></div>
+<h5>正在分析 5 檔 ETF 資料...</h5>
 </div>
 
 <div class="container py-4">
+    <div class="row mb-3">
+        <div class="col-12 d-flex justify-content-center gap-2 flex-wrap">
+            <a href="980a.html" class="btn btn-outline-primary fw-bold">980a</a>
+            <a href="981a.html" class="btn btn-outline-danger fw-bold">981a</a>
+            <a href="982a.html" class="btn btn-outline-success fw-bold">982a</a>
+            <a href="985a.html" class="btn btn-outline-warning text-dark fw-bold">985a</a>
+            <a href="991a.html" class="btn btn-outline-info fw-bold" style="color:#9c27b0; border-color:#9c27b0;">991a</a>
+        </div>
+    </div>
 
-<div class="row mb-3">
-    <div class="col-12 d-flex justify-content-center gap-2">
-        <a href="980a.html" class="btn btn-outline-primary fw-bold">980a</a>
-        <a href="981a.html" class="btn btn-outline-danger fw-bold">981a</a>
-        <a href="982a.html" class="btn btn-outline-success fw-bold">982a</a>
-        <a href="985a.html" class="btn btn-outline-warning text-dark fw-bold">985a</a>
+    <div class="row mb-4 text-center">
+        <div class="col-12">
+            <h2 class="fw-bold text-primary">📊 ETF 持股交叉比對 (含 991a)</h2>
+        </div>
     </div>
-</div>
-<div class="row mb-4">
-    <div class="col-12 text-center">
-        <h2 class="fw-bold text-primary">📊 ETF 持股交叉比對儀表板</h2>
-        <p class="text-secondary">資料來源：980a, 981a, 982a, 985a</p>
-    </div>
-</div>
 
-<div class="row text-center">
-    <div class="col-md-3">
-        <div class="card p-3">
-            <div class="metric-value" id="total-stocks">0</div>
-            <div class="metric-label">總持股數 (不重複)</div>
+    <div class="row text-center mb-4">
+        <div class="col-custom mb-3">
+            <div class="card p-2"><div class="metric-value" id="total-stocks">0</div><div class="metric-label">總持股數</div></div>
+        </div>
+        <div class="col-custom mb-3">
+            <div class="card p-2"><div class="metric-value text-danger" id="consensus-5">0</div><div class="metric-label">5家持有 🔥</div></div>
+        </div>
+        <div class="col-custom mb-3">
+            <div class="card p-2"><div class="metric-value text-danger" id="consensus-4">0</div><div class="metric-label">4家持有</div></div>
+        </div>
+        <div class="col-custom mb-3">
+            <div class="card p-2"><div class="metric-value text-warning" id="consensus-3">0</div><div class="metric-label">3家持有</div></div>
+        </div>
+        <div class="col-custom mb-3">
+            <div class="card p-2"><div class="metric-value text-success" id="consensus-2">0</div><div class="metric-label">2家持有</div></div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card p-3">
-            <div class="metric-value text-danger" id="consensus-4">0</div>
-            <div class="metric-label">4家共同持有 🔥</div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card p-3">
-            <div class="metric-value text-warning" id="consensus-3">0</div>
-            <div class="metric-label">3家共同持有</div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card p-3">
-            <div class="metric-value text-success" id="consensus-2">0</div>
-            <div class="metric-label">2家共同持有</div>
-        </div>
-    </div>
-</div>
 
-<div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">🏆 最熱門持股 (持有檔數 >= 3)</div>
-            <div class="card-body">
-                <canvas id="holdingsChart" height="100"></canvas>
+    <div class="card mb-4">
+        <div class="card-header">🏆 熱門持股圖表 (持有 >= 3家)</div>
+        <div class="card-body"><canvas id="holdingsChart" height="80"></canvas></div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">📋 詳細持股清單</div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table id="stocksTable" class="table table-hover align-middle w-100">
+                    <thead>
+                        <tr>
+                            <th>代號</th>
+                            <th>股票名稱</th>
+                            <th class="text-center">被持有數</th>
+                            <th>合計權重</th>
+                            <th>持有者明細</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
             </div>
         </div>
     </div>
-</div>
-
-<div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>📋 詳細持股清單</span>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table id="stocksTable" class="table table-hover align-middle w-100">
-                        <thead>
-                            <tr>
-                                <th>代號</th>
-                                <th>股票名稱</th>
-                                <th class="text-center">被持有數</th>
-                                <th>合計權重</th>
-                                <th>持有者明細</th>
-                                <th class="d-none">權重排序用</th> </tr>
-                        </thead>
-                        <tbody>
-                            </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 </div>
 
 <script src="https://code.jquery.com/jquery-3.7.0.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
 <script>
-// 設定 CSV 檔案清單 (請確保這些檔案與 index.html 在同一目錄下)
 const files = [
     { id: '980a', name: '980a', file: '980a.csv', color: 'bg-980a' },
     { id: '981a', name: '981a', file: '981a.csv', color: 'bg-981a' },
-    { id: '982a', name: '982a', file: '982a.csv', color: 'bg-982a' }, // 注意這裡用了你上傳的原始檔名
-    { id: '985a', name: '985a', file: '985a.csv', color: 'bg-985a' }
+    { id: '982a', name: '982a', file: '982a.csv', color: 'bg-982a' },
+    { id: '985a', name: '985a', file: '985a.csv', color: 'bg-985a' },
+    { id: '991a', name: '991a', file: '991a.csv', color: 'bg-991a' }
 ];
 
-let stockData = {}; // { '2330': { name: '台積電', holders: ['980a', ...], weights: {} } }
+let stockData = {};
 
-// 初始化
-$(document).ready(function() {
-    fetchAllFiles();
-});
-
-function fetchAllFiles() {
-    let promises = files.map(f => {
-        return new Promise((resolve, reject) => {
-            Papa.parse(f.file, {
-                download: true,
-                header: true,
-                skipEmptyLines: true,
-                complete: function(results) {
-                    processData(f.id, results.data);
-                    resolve();
-                },
-                error: function(err) {
-                    console.error("Error parsing " + f.file, err);
-                    // 即使失敗也 resolve，避免卡住
-                    resolve(); 
-                }
-            });
+$(document).ready(() => {
+    const promises = files.map(f => new Promise(resolve => {
+        Papa.parse(f.file, {
+            download: true,
+            header: true,
+            skipEmptyLines: true,
+            complete: results => {
+                console.log(`讀取 ${f.id} 成功，共 ${results.data.length} 筆`);
+                processData(f.id, results.data);
+                resolve();
+            },
+            error: () => { console.error(`無法讀取 ${f.file}`); resolve(); }
         });
-    });
+    }));
 
     Promise.all(promises).then(() => {
         renderDashboard();
         $('#loading').fadeOut();
     });
-}
+});
 
 function processData(fundId, data) {
-    data.forEach(row => {
-        // 處理欄位名稱不一致的問題
-        // 常見欄位: 股票代號, 股票名稱, 權重(%), 權重%
-        let code = row['股票代號'] || row['代號'];
-        let name = row['股票名稱'] || row['名稱'];
-        
-        // 嘗試抓取權重 (可能為字串，需轉浮點數)
-        let weight = row['權重(%)'] || row['權重%'] || row['權重'] || 0;
-        
+    data.forEach((row, index) => {
+        // 關鍵修改：增加更多可能的欄位識別名稱
+        let code = row['股票代號'] || row['代號'] || row['證券代號'] || row['証券代號'] || row['Stock Code'] || row['成分股代號'];
+        let name = row['股票名稱'] || row['名稱'] || row['證券名稱'] || row['証券名稱'] || row['Name'] || row['成分股名稱'];
+        let weight = row['權重(%)'] || row['權重%'] || row['權重'] || row['Weight'] || 0;
+
         if (code && name) {
-            code = code.toString().trim();
+            code = code.toString().trim().replace(".TW", ""); // 去除可能的後綴
             name = name.toString().trim();
             
             if (!stockData[code]) {
-                stockData[code] = {
-                    name: name,
-                    holders: [],
-                    weights: []
-                };
+                stockData[code] = { name: name, holders: [], weights: [] };
             }
-            
-            // 總是使用較長的名稱 (避免簡稱)
-            if (name.length > stockData[code].name.length) {
-                stockData[code].name = name;
-            }
-
             if (!stockData[code].holders.includes(fundId)) {
                 stockData[code].holders.push(fundId);
-                stockData[code].weights.push({ fund: fundId, val: parseFloat(weight) });
+                stockData[code].weights.push({ fund: fundId, val: parseFloat(weight) || 0 });
             }
         }
     });
 }
 
 function renderDashboard() {
-    const tableBody = $('#stocksTable tbody');
-    
-    // 1. 整理數據並計算合計權重
     const stocksArray = Object.keys(stockData).map(key => {
-        // 計算該股票在所有 ETF 中的權重總和
         let sumWeight = stockData[key].weights.reduce((acc, curr) => acc + curr.val, 0);
-        
         return {
             code: key,
             ...stockData[key],
             count: stockData[key].holders.length,
-            totalWeight: sumWeight.toFixed(2) // 取小數點後兩位
+            totalWeight: sumWeight.toFixed(2)
         };
     });
 
-    // 更新上方卡片數據
+    // 更新面板數據
     $('#total-stocks').text(stocksArray.length);
+    $('#consensus-5').text(stocksArray.filter(s => s.count === 5).length);
     $('#consensus-4').text(stocksArray.filter(s => s.count === 4).length);
     $('#consensus-3').text(stocksArray.filter(s => s.count === 3).length);
     $('#consensus-2').text(stocksArray.filter(s => s.count === 2).length);
 
-    // 準備圖表數據
-    let chartData = stocksArray.filter(s => s.count >= 3).sort((a, b) => b.count - a.count);
-    if(chartData.length > 20) chartData = chartData.slice(0, 20);
-
-    // 繪製圖表 (若已存在則先銷毀，避免重疊)
+    // 圖表
+    let chartData = stocksArray.filter(s => s.count >= 3).sort((a, b) => b.count - a.count).slice(0, 20);
     const ctx = document.getElementById('holdingsChart').getContext('2d');
-    if (window.myChart) window.myChart.destroy(); // 防止圖表重複渲染
-    window.myChart = new Chart(ctx, {
+    new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: chartData.map(s => `${s.name} (${s.code})`),
+            labels: chartData.map(s => `${s.name}`),
             datasets: [{
-                label: '被持有檔數',
                 data: chartData.map(s => s.count),
-                backgroundColor: chartData.map(s => s.count === 4 ? '#dc3545' : '#ffc107'),
-                borderWidth: 1
+                backgroundColor: chartData.map(s => s.count >= 4 ? '#dc3545' : '#ffc107')
             }]
         },
-        options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
-        }
+        options: { plugins: { legend: false }, scales: { y: { beginAtZero: true, max: 5, ticks: { stepSize: 1 } } } }
     });
 
-    // 渲染表格
-    tableBody.empty(); // 清空舊資料
+    // 表格渲染
+    const tableBody = $('#stocksTable tbody').empty();
     stocksArray.forEach(stock => {
-        // 產生持有者徽章
-        let badges = '';
-        files.forEach(f => {
-            if (stock.holders.includes(f.id)) {
-                badges += `<span class="badge ${f.color} badge-fund">${f.name}</span>`;
-            }
-        });
-
-        let countClass = '';
-        if (stock.count === 4) countClass = 'consensus-high';
-        else if (stock.count === 3) countClass = 'consensus-mid';
-
-        // 產生權重條 (最高設為 5% 填滿，可自己調整顯示比例)
-        // 這裡設定 width: min(weight * 20, 100) 意思是 5% 就會滿格，讓視覺差異明顯一點
-        let weightBar = `
-            <div class="d-flex align-items-center" style="min-width: 100px;">
-                <span class="me-2 small fw-bold">${stock.totalWeight}%</span>
-                <div class="progress flex-grow-1" style="height: 6px;">
-                    <div class="progress-bar bg-info" role="progressbar" 
-                         style="width: ${Math.min(stock.totalWeight * 20, 100)}%"></div>
-                </div>
-            </div>
-        `;
-
-        // Yahoo 股市連結
+        let badges = files.map(f => stock.holders.includes(f.id) ? `<span class="badge ${f.color} badge-fund">${f.name}</span>` : '').join('');
+        let countClass = stock.count >= 4 ? 'consensus-high' : (stock.count === 3 ? 'consensus-mid' : '');
         let stockLink = `https://tw.stock.yahoo.com/quote/${stock.code}`;
 
         tableBody.append(`
             <tr>
+                <td><a href="${stockLink}" target="_blank" class="badge bg-secondary text-decoration-none">${stock.code}</a></td>
+                <td class="fw-bold">${stock.name}</td>
+                <td class="text-center ${countClass}">${stock.count}</td>
                 <td>
-                    <a href="${stockLink}" target="_blank" class="badge bg-secondary text-decoration-none" title="點擊查看股價">
-                        ${stock.code} 🔗
-                    </a>
+                    <div class="d-flex align-items-center">
+                        <span class="me-2 small">${stock.totalWeight}%</span>
+                        <div class="progress flex-grow-1" style="height: 6px;">
+                            <div class="progress-bar bg-info" style="width: ${Math.min(stock.totalWeight * 5, 100)}%"></div>
+                        </div>
+                    </div>
                 </td>
-                <td class="fw-bold">
-                    <a href="${stockLink}" target="_blank" class="text-dark text-decoration-none">
-                        ${stock.name}
-                    </a>
-                </td>
-                <td class="text-center ${countClass}" style="font-size:1.2em;">${stock.count}</td>
-                <td>${weightBar}</td> <td>${badges}</td>
-                <td class="d-none">${stock.count}</td>
+                <td>${badges}</td>
             </tr>
         `);
     });
 
-    // 啟動 DataTables (如果已經初始化過，要先銷毀再重建)
-    if ($.fn.DataTable.isDataTable('#stocksTable')) {
-        $('#stocksTable').DataTable().destroy();
-    }
-    
-    $('#stocksTable').DataTable({
-        "order": [[ 2, "desc" ]], 
-        "pageLength": 25,
-        "language": {
-            "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/zh-HANT.json"
-        }
-    });
+    $('#stocksTable').DataTable({ "order": [[ 2, "desc" ]], "pageLength": 25, "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/zh-HANT.json" } });
 }
 </script>
 </body>
