@@ -1,0 +1,38 @@
+name: Daily ETF Scraper
+
+on:
+  schedule:
+    # 台灣時間 18:00 等於 UTC 10:00
+    - cron: '0 11 * * *'
+  workflow_dispatch: # 允許手動點擊執行測試
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # 授予寫入權限，讓 Action 能把 CSV/HTML 推送到 Repo
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install requests pandas openpyxl
+
+      - name: Run ETF Scraper
+        run: python 991a.py  # 確保你的檔名正確
+
+      - name: Commit and Push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add 991a.csv 991a.html 991a/
+          # 如果沒有變動就不提交，避免報錯
+          git commit -m "Auto-update ETF holdings: $(date)" || echo "No changes to commit"
+          git push
