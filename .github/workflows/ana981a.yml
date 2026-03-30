@@ -13,9 +13,24 @@ permissions:
   pages: write
   id-token: write
 
+# 確保同時只有一個部署任務在執行
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
   build-and-deploy:
+    # 指定部署環境，解決 Missing environment 錯誤
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
     runs-on: ubuntu-latest
+    
+    # 解決 Node.js 20 警告
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
     steps:
       - name: 檢出代碼
         uses: actions/checkout@v4
@@ -40,4 +55,5 @@ jobs:
           path: '.' # index.html 生成在根目錄
 
       - name: 部署至 GitHub Pages
+        id: deployment
         uses: actions/deploy-pages@v4
