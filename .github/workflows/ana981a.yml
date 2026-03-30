@@ -9,7 +9,7 @@ on:
   workflow_dispatch:        # 允許手動執行
 
 permissions:
-  contents: read
+  contents: write           # 必須要有 write 權限才能 commit 回倉庫
   pages: write
   id-token: write
 
@@ -20,14 +20,12 @@ concurrency:
 
 jobs:
   build-and-deploy:
-    # 指定部署環境，解決 Missing environment 錯誤
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
     runs-on: ubuntu-latest
     
-    # 解決 Node.js 20 警告
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -46,13 +44,32 @@ jobs:
       - name: 執行分析腳本
         run: python ana981a.py
 
+      - name: 驗證檔案是否產生 (Debug)
+        run: |
+          if [ -f "ana981a.html" ]; then
+            echo "✅ ana981a.html 已成功產生！"
+            ls -lh ana981a.html
+          else
+            echo "❌ 錯誤：找不到 index.html"
+            exit 1
+          fi
+
+      - name: 將 index.html 提交回倉庫
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add ana981a.html
+          # 如果檔案沒有變動，commit 會失敗，所以加上 || exit 0 確保流程繼續
+          git commit -m "自動更新持股分析報告 [skip ci]" || echo "沒有偵測到 index.html 的變動"
+          git push
+
       - name: 設定 GitHub Pages
         uses: actions/configure-pages@v4
 
       - name: 上傳 index.html 成品
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.' # index.html 生成在根目錄
+          path: '.' # 上傳根目錄
 
       - name: 部署至 GitHub Pages
         id: deployment
