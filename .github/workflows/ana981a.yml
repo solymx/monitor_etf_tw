@@ -1,0 +1,43 @@
+name: 自動分析 ETF 並部署報告
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '981a/**.csv'      # 只有 981a 底下的 CSV 變動時才觸發
+      - 'ana981a.py'
+  workflow_dispatch:        # 允許手動執行
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 檢出代碼
+        uses: actions/checkout@v4
+
+      - name: 設定 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: 安裝 Pandas 與 Plotly
+        run: pip install pandas plotly
+
+      - name: 執行分析腳本
+        run: python ana981a.py
+
+      - name: 設定 GitHub Pages
+        uses: actions/configure-pages@v4
+
+      - name: 上傳 index.html 成品
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.' # index.html 生成在根目錄
+
+      - name: 部署至 GitHub Pages
+        uses: actions/deploy-pages@v4
